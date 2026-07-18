@@ -114,36 +114,44 @@ factory.on("TokenCreated", async (creator, tokenAddress, name, symbol, totalSupp
 });
 
 async function backfillPastEvents() {
-  const last = await getLastBlock();
-  const currentBlock = await provider.getBlockNumber();
-  const fromBlock = last !== null ? last + 1 : Number(process.env.FACTORY_DEPLOY_BLOCK || 0);
+  try {
+    const last = await getLastBlock();
+    const currentBlock = await provider.getBlockNumber();
+    const fromBlock = last !== null ? last + 1 : Number(process.env.FACTORY_DEPLOY_BLOCK || 0);
 
-  if (fromBlock > currentBlock) return;
+    if (fromBlock > currentBlock) return;
 
-  console.log(`Syncing events from block ${fromBlock} to ${currentBlock}...`);
+    console.log(`Syncing events from block ${fromBlock} to ${currentBlock}...`);
 
-  const CHUNK = Number(process.env.LOG_CHUNK_SIZE || 10);
-  for (let start = fromBlock; start <= currentBlock; start += CHUNK) {
-    const end = Math.min(start + CHUNK - 1, currentBlock);
-    const events = await factory.queryFilter(factory.filters.TokenCreated(), start, end);
+    const CHUNK = Number(process.env.LOG_CHUNK_SIZE || 2000);
+    for (let start = fromBlock; start <= currentBlock; start += CHUNK) {
+      const end = Math.min(start + CHUNK - 1, currentBlock);
+      try {
+        const events = await factory.queryFilter(factory.filters.TokenCreated(), start, end);
 
-    for (const event of events) {
-      const block = await event.getBlock();
-      await insertToken({
-        creator: event.args.creator,
-        tokenAddress: event.args.tokenAddress,
-        name: event.args.name,
-        symbol: event.args.symbol,
-        totalSupply: event.args.totalSupply.toString(),
-        paymentMethod: event.args.paymentMethod,
-        txHash: event.transactionHash,
-        blockNumber: event.blockNumber,
-        createdAt: block.timestamp,
-      });
+        for (const event of events) {
+          const block = await event.getBlock();
+          await insertToken({
+            creator: event.args.creator,
+            tokenAddress: event.args.tokenAddress,
+            name: event.args.name,
+            symbol: event.args.symbol,
+            totalSupply: event.args.totalSupply.toString(),
+            paymentMethod: event.args.paymentMethod,
+            txHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            createdAt: block.timestamp,
+          });
+        }
+        await setLastBlock(end);
+      } catch (chunkErr) {
+        console.error(`Error syncing blocks ${start}-${end}, skipping chunk:`, chunkErr.shortMessage || chunkErr.message);
+      }
     }
-    await setLastBlock(end);
+    console.log("Sync complete.");
+  } catch (err) {
+    console.error("Backfill failed:", err.shortMessage || err.message);
   }
-  console.log("Sync complete.");
 }
 
 app.get("/api/tokens", async (req, res) => {
@@ -192,6 +200,10 @@ app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 
 app.listen(PORT, async () => {
   console.log(`Backend running on port ${PORT}`);
-  await initDb();
-  await backfillPastEvents();
+  try {
+    await initDb();
+    await backfillPastEvents();
+  } catch (err) {
+    console.error("Startup sync error (server still running):", err);
+  }
 });
