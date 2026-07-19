@@ -1,7 +1,7 @@
 {
-  "name": "token-factory",
+  "name": "root-launcher",
   "version": "1.0.0",
   "scripts": {
-    "start": "cd backend && node server.js"
+    "start": "cd token-factory/backend && npm install && node server.js"
   }
 }
