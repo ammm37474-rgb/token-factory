@@ -8,6 +8,7 @@ import TokenList from "./TokenList.jsx";
 // آدرس‌ها را بعد از دیپلوی واقعی جایگزین کنید / Replace after real deployment
 const FACTORY_ADDRESS = "0x7DEAfCf7B5998F68250bCa1704246380177CEAF6";
 const USDT_ADDRESS = "0xc2132D05D31c914a87C6611C10748AEb04B58e8"; // USDT on Polygon Mainnet
+const POLYGON_CHAIN_ID = "0x89"; // 137 in hex
 
 const FACTORY_ABI = [
   "function createTokenWithMatic(string name_, string symbol_, uint256 totalSupply_, uint256 maxFee) external payable returns (address)",
@@ -18,7 +19,10 @@ const FACTORY_ABI = [
   "event TokenCreated(address indexed creator, address indexed tokenAddress, string name, string symbol, uint256 totalSupply, string paymentMethod)",
 ];
 
-const ERC20_ABI = ["function approve(address spender, uint256 amount) external returns (bool)"];
+const ERC20_ABI = [
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
+];
 
 const FEE_SLIPPAGE_BPS = 300n; // 3%
 
@@ -191,7 +195,6 @@ function Guide() {
   );
 }
 
-
 function MintConsole({ wallet, onConnect }) {
   const { t } = useLanguage();
   const [name, setName] = useState("");
@@ -200,6 +203,7 @@ function MintConsole({ wallet, onConnect }) {
   const [payMethod, setPayMethod] = useState("matic");
   const [status, setStatus] = useState({ text: "", kind: "" });
   const [deployedAddress, setDeployedAddress] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   function withSlippage(fee) {
     return fee + (fee * FEE_SLIPPAGE_BPS) / 10000n;
@@ -208,11 +212,40 @@ function MintConsole({ wallet, onConnect }) {
   async function getSigner() {
     if (!window.ethereum) throw new Error(t.errNoWallet);
     const provider = new BrowserProvider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
+    
+    // هماهنگ‌سازی اتوماتیک با شبکه پولیگان پیش از شروع تراکنش
+    const network = await provider.getNetwork();
+    if (network.chainId !== 137n) {
+      try {
+        await window.ethereum.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: POLYGON_CHAIN_ID }],
+        });
+      } catch (switchError) {
+        // اگر شبکه پولیگان در ولت ست نشده باشد، آن را اضافه می‌کند
+        if (switchError.code === 4902) {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+              chainId: POLYGON_CHAIN_ID,
+              chainName: "Polygon Mainnet",
+              nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
+              rpcUrls: ["https://polygon-rpc.com"],
+              blockExplorerUrls: ["https://polygonscan.com"],
+            }],
+          });
+        } else {
+          throw switchError;
+        }
+      }
+    }
+
+    await window.ethereum.request({ method: "eth_requestAccounts" });
     return await provider.getSigner();
   }
 
   async function handleMint() {
+    if (isLoading) return;
     try {
       if (!name || name.length > 50) throw new Error(t.errName);
       if (!symbol || symbol.length > 11) throw new Error(t.errSymbol);
@@ -221,10 +254,14 @@ function MintConsole({ wallet, onConnect }) {
       const contentCheck = checkTokenContent(name, symbol);
       if (!contentCheck.allowed) throw new Error(contentCheck.reason);
 
+      setIsLoading(true);
       setDeployedAddress("");
       setStatus({ text: t.statusConnecting, kind: "" });
+      
       const signer = await getSigner();
-      onConnect(await signer.getAddress());
+      const userAddress = await signer.getAddress();
+      onConnect(userAddress);
+      
       const factory = new Contract(FACTORY_ADDRESS, FACTORY_ABI, signer);
       const totalSupplyWei = parseUnits(supply, 18);
 
@@ -240,9 +277,19 @@ function MintConsole({ wallet, onConnect }) {
         const fee = await factory.feeInUsdt();
         const maxFee = withSlippage(fee);
         const usdt = new Contract(USDT_ADDRESS, ERC20_ABI, signer);
+        
+        // رفع باگ استاندارد USDT پولیگان: اگر تاییدیه قبلی باقی مانده باشد آن را ابتدا صفر می‌کند
+        const currentAllowance = await usdt.allowance(userAddress, FACTORY_ADDRESS);
+        if (currentAllowance > 0n) {
+          setStatus({ text: t.statusApprove || "Resetting USDT allowance...", kind: "" });
+          const resetTx = await usdt.approve(FACTORY_ADDRESS, 0);
+          await resetTx.wait();
+        }
+
         setStatus({ text: t.statusApprove, kind: "" });
         const approveTx = await usdt.approve(FACTORY_ADDRESS, maxFee);
         await approveTx.wait();
+        
         setStatus({ text: t.statusSendingUsdt, kind: "" });
         tx = await factory.createTokenWithUsdt(name, symbol, totalSupplyWei, maxFee);
       }
@@ -250,21 +297,30 @@ function MintConsole({ wallet, onConnect }) {
       setStatus({ text: t.statusWaiting, kind: "" });
       const receipt = await tx.wait();
 
-      const event = receipt.logs
-        .map((log) => {
-          try {
-            return factory.interface.parseLog(log);
-          } catch {
-            return null;
+      // شیوه پایدار و تضمین شده استخراج لاگ‌ها در ورژن 6 اترز
+      let foundAddress = "";
+      for (const log of receipt.logs) {
+        try {
+          const parsedLog = factory.interface.parseLog({
+            topics: [...log.topics],
+            data: log.data,
+          });
+          if (parsedLog && parsedLog.name === "TokenCreated") {
+            foundAddress = parsedLog.args.tokenAddress;
+            break;
           }
-        })
-        .find((e) => e && e.name === "TokenCreated");
+        } catch {
+          // لاگ‌های فرعی یا مربوط به توکن پرداخت نادیده گرفته می‌شوند
+        }
+      }
 
-      if (event) setDeployedAddress(event.args.tokenAddress);
+      if (foundAddress) setDeployedAddress(foundAddress);
       setStatus({ text: t.statusSuccess, kind: "success" });
     } catch (err) {
       console.error(err);
       setStatus({ text: `${t.statusError}: ${err.reason || err.message}`, kind: "error" });
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -278,6 +334,7 @@ function MintConsole({ wallet, onConnect }) {
           <input
             value={name}
             maxLength={50}
+            disabled={isLoading}
             onChange={(e) => setName(e.target.value)}
             placeholder={t.namePlaceholder}
           />
@@ -289,13 +346,19 @@ function MintConsole({ wallet, onConnect }) {
             <input
               value={symbol}
               maxLength={11}
+              disabled={isLoading}
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               placeholder={t.symbolPlaceholder}
             />
           </div>
           <div className="field">
             <label>{t.supplyLabel}</label>
-            <input value={supply} onChange={(e) => setSupply(e.target.value)} placeholder={t.supplyPlaceholder} />
+            <input 
+              value={supply} 
+              disabled={isLoading}
+              onChange={(e) => setSupply(e.target.value)} 
+              placeholder={t.supplyPlaceholder} 
+            />
           </div>
         </div>
 
@@ -303,22 +366,22 @@ function MintConsole({ wallet, onConnect }) {
           <label>{t.paymentLabel}</label>
           <div className="pay-toggle">
             <div
-              className={`pay-option ${payMethod === "matic" ? "active" : ""}`}
-              onClick={() => setPayMethod("matic")}
+              className={`pay-option ${payMethod === "matic" ? "active" : ""} ${isLoading ? "disabled" : ""}`}
+              onClick={() => !isLoading && setPayMethod("matic")}
             >
               {t.payMatic}
             </div>
             <div
-              className={`pay-option ${payMethod === "usdt" ? "active" : ""}`}
-              onClick={() => setPayMethod("usdt")}
+              className={`pay-option ${payMethod === "usdt" ? "active" : ""} ${isLoading ? "disabled" : ""}`}
+              onClick={() => !isLoading && setPayMethod("usdt")}
             >
               {t.payUsdt}
             </div>
           </div>
         </div>
 
-        <button className="mint-btn" onClick={handleMint}>
-          {t.mintButton}
+        <button className="mint-btn" onClick={handleMint} disabled={isLoading}>
+          {isLoading ? "..." : t.mintButton}
         </button>
 
         {status.text && <p className={`status-line ${status.kind}`}>{status.text}</p>}
@@ -345,6 +408,19 @@ function Shell() {
     document.documentElement.lang = lang;
     document.body.dir = dir;
   }, [lang, dir]);
+
+  // گوش دادن به تغییرات وضعیت حساب کاربر در متامسک به جهت آپدیت ری‌اکتیو کامپوننت‌ها
+  useEffect(() => {
+    if (window.ethereum) {
+      const handleAccounts = (accounts) => {
+        setWallet(accounts[0] || null);
+      };
+      window.ethereum.on("accountsChanged", handleAccounts);
+      return () => {
+        window.ethereum.removeListener("accountsChanged", handleAccounts);
+      };
+    }
+  }, []);
 
   async function connect() {
     try {
