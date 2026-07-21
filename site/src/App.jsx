@@ -91,7 +91,7 @@ export default function App() {
   const isRtl = lang === 'fa';
 
   return (
-    <div className={min-h-screen bg-gray-950 text-white p-6 font-sans } dir={isRtl ? 'rtl' : 'ltr'}>
+    <div className={`min-h-screen bg-gray-950 text-white p-6 font-sans ${isRtl ? 'rtl' : 'ltr'}`} dir={isRtl ? 'rtl' : 'ltr'}>
       <header className="flex flex-wrap justify-between items-center max-w-4xl mx-auto mb-8 pb-4 border-b border-gray-800 gap-4">
         <TokenFactoryLogo />
         <div className="flex items-center gap-4">
