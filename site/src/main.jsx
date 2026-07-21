@@ -1,20 +1,20 @@
+import './index.css';
+import '@rainbow-me/rainbowkit/styles.css';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
-import './index.css';
 
-import '@rainbow-me/rainbowkit/styles.css';
 import {
   getDefaultConfig,
   RainbowKitProvider,
 } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
 import { polygon } from 'wagmi/chains';
-import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
+import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 
 const config = getDefaultConfig({
   appName: 'Token Factory',
-  projectId: 'YOUR_PROJECT_ID',
+  projectId: '3a8170812b534d0ff9d794f19a901d84', // شناسه عمومی استاندارد برای راه‌اندازی
   chains: [polygon],
   ssr: false,
 });
@@ -30,5 +30,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
