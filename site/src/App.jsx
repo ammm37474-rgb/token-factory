@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useLanguage } from "./i18n.jsx";
 
 function Logo() {
@@ -41,7 +41,6 @@ function CopyButton({ text }) {
 }
 
 const RPC_URL = "https://polygon-rpc.com";
-const CHAIN_ID_HEX = "0x89";
 
 const NETWORK_DETAILS = {
   en: [
@@ -88,9 +87,7 @@ function NavBar({ lang, setLang }) {
     <nav className="flex items-center justify-between px-4 sm:px-8 py-4 border-b border-gray-800">
       <div className="flex items-center gap-2">
         <Logo />
-        <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-          {t.brand}
-        </span>
+        <span className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">{t.brand}</span>
       </div>
       <div className="flex items-center gap-3">
         <select value={lang} onChange={(e) => setLang(e.target.value)}
@@ -102,9 +99,9 @@ function NavBar({ lang, setLang }) {
   );
 }
 
-function Section({ id, title, children, className }) {
+function Section({ id, title, children }) {
   return (
-    <section id={id} className={`max-w-4xl mx-auto px-4 py-12 scroll-mt-16 ${className || ""}`}>
+    <section id={id} className="max-w-4xl mx-auto px-4 py-12 scroll-mt-16">
       {title && <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 text-purple-300">{title}</h2>}
       {children}
     </section>
@@ -121,7 +118,6 @@ export default function App() {
   const [payment, setPayment] = useState("matic");
   const [minting, setMinting] = useState(false);
   const [createdToken, setCreatedToken] = useState(null);
-
   const [activeTab, setActiveTab] = useState("create");
 
   useEffect(() => {
@@ -146,8 +142,6 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       <NavBar lang={lang} setLang={setLang} />
-
-      {/* Hero */}
       <div className="text-center py-16 px-4 bg-gradient-to-b from-purple-900/10 to-transparent">
         <h1 className="text-3xl sm:text-5xl font-bold mb-4">
           {t.heroTitle} <span className="text-purple-400 italic">{t.heroTitleAccent}</span>
@@ -155,7 +149,6 @@ export default function App() {
         <p className="text-gray-400 max-w-xl mx-auto text-sm sm:text-base leading-relaxed">{t.heroBody}</p>
       </div>
 
-      {/* Tabs */}
       <div className="flex justify-center gap-2 mb-8 px-4 flex-wrap">
         {[
           { id: "create", label: t.formTitle },
@@ -172,7 +165,6 @@ export default function App() {
         ))}
       </div>
 
-      {/* Create Token */}
       {activeTab === "create" && (
         <Section>
           <div className="max-w-lg mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-6 sm:p-8 shadow-xl">
@@ -211,7 +203,6 @@ export default function App() {
                 {minting ? t.minting : t.mintButton}
               </button>
             </form>
-
             {createdToken && (
               <div className="mt-6 p-5 bg-gray-800/50 border border-green-500/30 rounded-xl">
                 <div className="flex items-center gap-2 text-green-400 font-bold mb-3">
@@ -227,9 +218,7 @@ export default function App() {
                 </div>
                 <div className="mt-3 flex gap-2 flex-wrap">
                   <a href={`${createdToken.explorer}/token/${createdToken.address}`} target="_blank" rel="noreferrer"
-                    className="text-sm text-blue-400 hover:text-blue-300 underline">
-                    {t.viewPoly} ↗
-                  </a>
+                    className="text-sm text-blue-400 hover:text-blue-300 underline">{t.viewPoly} ↗</a>
                   <span className="text-sm text-gray-500">|</span>
                   <span className="text-sm text-gray-400">{t.addWalletGuide}</span>
                 </div>
@@ -239,18 +228,14 @@ export default function App() {
         </Section>
       )}
 
-      {/* Wallet Guide */}
       {activeTab === "wallet" && (
         <Section title={t.walletGuide}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
-            {WALLETS.map(w => (
-              <WalletCard key={w.id} name={w.name} desc={t[w.descKey]} url={w.url} />
-            ))}
+            {WALLETS.map(w => <WalletCard key={w.id} name={w.name} desc={t[w.descKey]} url={w.url} />)}
           </div>
         </Section>
       )}
 
-      {/* Network Guide */}
       {activeTab === "network" && (
         <Section title={t.networkGuide}>
           <div className="max-w-lg mx-auto bg-gray-900 border border-gray-800 rounded-2xl p-6">
@@ -262,42 +247,33 @@ export default function App() {
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-xs text-gray-500 leading-relaxed">
-              MetaMask → Settings → Networks → Add Network → Fill details above
-            </p>
+            <p className="mt-4 text-xs text-gray-500 leading-relaxed">MetaMask → Settings → Networks → Add Network → Fill details above</p>
           </div>
         </Section>
       )}
 
-      {/* Buy Guide */}
       {activeTab === "buy" && (
         <Section title={t.howToBuy}>
-          <div className="max-w-lg mx-auto space-y-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-              <h3 className="font-bold text-purple-400 mb-3">{t.maticAmount} / {t.usdtAmount}</h3>
-              <ol className="space-y-3 text-sm text-gray-300">
-                <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">1.</span>{t.exchangeStep1}</li>
-                <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">2.</span>{t.exchangeStep2}</li>
-                <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">3.</span>{t.exchangeStep3}</li>
-              </ol>
-            </div>
+          <div className="max-w-lg mx-auto bg-gray-900 border border-gray-800 rounded-xl p-5">
+            <h3 className="font-bold text-purple-400 mb-3">{t.maticAmount} / {t.usdtAmount}</h3>
+            <ol className="space-y-3 text-sm text-gray-300">
+              <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">1.</span>{t.exchangeStep1}</li>
+              <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">2.</span>{t.exchangeStep2}</li>
+              <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">3.</span>{t.exchangeStep3}</li>
+            </ol>
           </div>
         </Section>
       )}
 
-      {/* DEX / Liquidity Guide */}
       {activeTab === "dex" && (
         <Section title={t.liquidity}>
           <div className="max-w-2xl mx-auto space-y-6">
-            {/* DEX */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h3 className="font-bold text-purple-400 mb-4">{t.dexGuide}</h3>
               <div className="flex gap-3 mb-4 flex-wrap">
                 {DEXES.map(d => (
                   <a key={d.name} href={d.url} target="_blank" rel="noreferrer"
-                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-4 py-2 text-sm font-medium transition-all">
-                    {d.name} ↗
-                  </a>
+                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-4 py-2 text-sm font-medium transition-all">{d.name} ↗</a>
                 ))}
               </div>
               <ol className="space-y-2 text-sm text-gray-300">
@@ -307,20 +283,16 @@ export default function App() {
                 <li className="flex gap-3"><span className="text-purple-400 font-bold shrink-0">4.</span>{t.dexStep4}</li>
               </ol>
             </div>
-            {/* CEX */}
             <div className="bg-gray-900 border border-amber-500/20 rounded-xl p-6">
               <h3 className="font-bold text-amber-400 mb-3">{t.cexGuide}</h3>
               <p className="text-sm text-gray-400">{t.cexNote}</p>
             </div>
-            {/* Aggregators */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h3 className="font-bold text-purple-400 mb-4">{t.aggregatorGuide}</h3>
               <div className="flex gap-3 flex-wrap">
                 {AGGREGATORS.map(a => (
                   <a key={a.name} href={a.url} target="_blank" rel="noreferrer"
-                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-4 py-2 text-sm font-medium transition-all">
-                    {a.name} ↗
-                  </a>
+                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg px-4 py-2 text-sm font-medium transition-all">{a.name} ↗</a>
                 ))}
               </div>
             </div>
@@ -328,17 +300,13 @@ export default function App() {
         </Section>
       )}
 
-      {/* Token List */}
       {activeTab === "tokens" && (
         <Section title={t.tokensList}>
           <TokenList />
         </Section>
       )}
 
-      {/* Footer */}
-      <footer className="border-t border-gray-800 py-6 text-center text-xs text-gray-500 px-4">
-        {t.footer}
-      </footer>
+      <footer className="border-t border-gray-800 py-6 text-center text-xs text-gray-500 px-4">{t.footer}</footer>
     </div>
   );
 }
@@ -346,11 +314,7 @@ export default function App() {
 function TokenList() {
   const { t } = useLanguage();
   const [tokens] = useState(() => JSON.parse(localStorage.getItem("deployedTokens") || "[]"));
-
-  if (tokens.length === 0) {
-    return <p className="text-center text-gray-500">{t.noTokens}</p>;
-  }
-
+  if (tokens.length === 0) return <p className="text-center text-gray-500">{t.noTokens}</p>;
   return (
     <div className="overflow-x-auto max-w-3xl mx-auto">
       <table className="w-full text-sm">
